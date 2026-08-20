@@ -72,6 +72,8 @@ function calculate() {
   const nsoIncome = nsos.reduce((s,x) => s + x.shares * ((x.fmv||0)-(x.strike||0)), 0);
   const isoAdjustment = isos.reduce((s,x) => s + x.shares * ((x.fmv||0)-(x.strike||0)), 0);
   const isoCost = isos.reduce((s,x) => s + x.shares * (x.strike||0), 0);
+  const isoExerciseValue = isos.reduce((s,x) => s + x.shares * (x.strike || 0),0);
+  const isoLimitWarning = isoExerciseValue > 100000;
 
   const grossIncome = salary + rsuIncome + nsoIncome;
   const taxableIncome = Math.max(0, grossIncome - pretax401k - hsa - STANDARD_DEDUCTION[status]);
@@ -100,7 +102,15 @@ function calculate() {
     ["Total Federal Tax", totalFederalTax]
   ];
 
-  $("results").innerHTML = rows.map(([k,v]) =>
+$("results").innerHTML =
+  (isoLimitWarning
+    ? `<div class="warning">
+        ⚠️ ISO exercise value is above $100,000. The $100,000 ISO limitation
+        should be reviewed separately; this calculator does not automatically
+        reclassify excess options as NSOs. Lower the number of shares!
+       </div>`
+    : "") +
+  rows.map(([k,v]) =>
     `<div class="result-row ${k==="Total Federal Tax" ? "highlight":""}">
       <span>${k}</span><strong>${money(v)}</strong>
     </div>`
