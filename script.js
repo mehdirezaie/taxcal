@@ -1,3 +1,4 @@
+// https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill
 const FEDERAL_BRACKETS = {
   single: [[12400,.10],[50400,.12],[105700,.22],[201775,.24],[256225,.32],[640600,.35],[Infinity,.37]],
   married: [[24800,.10],[100800,.12],[211400,.22],[403550,.24],[512450,.32],[768700,.35],[Infinity,.37]]
@@ -79,7 +80,6 @@ function calculate() {
   const taxableIncome = Math.max(0, grossIncome - pretax401k - hsa - STANDARD_DEDUCTION[status]);
   const regularTax = federalTax(taxableIncome, status);
 
-  // Matches the supplied Python calculator:
   // AMTI = taxable income + ISO AMT adjustment + standard deduction.
   const amti = taxableIncome + isoAdjustment + STANDARD_DEDUCTION[status];
   const exemption = amtExemption(amti, status);
@@ -132,8 +132,7 @@ $("addIso").onclick = () => addGrant("isos","iso");
 $("addNso").onclick = () => addGrant("nsos","nso");
 $("calculate").onclick = calculate;
 
-// Load the example from the supplied Python code.
-addGrant("rsus","rsu",{shares:1007,price:400});
-addGrant("isos","iso",{shares:298,strike:340,fmv:400});
-addGrant("nsos","nso",{shares:75,strike:340,fmv:400});
+addGrant("rsus","rsu",{shares:100,price:400});
+addGrant("isos","iso",{shares:20,strike:300,fmv:400});
+addGrant("nsos","nso",{shares:30,strike:300,fmv:400});
 calculate();
