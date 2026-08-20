@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tax & AMT Calculator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Tax & AMT Calculator</h1>
+      <p>2026 federal tax estimate for salary, RSUs, NSOs, and ISOs.</p>
+    </header>
+
+    <section class="card">
+      <h2>Income & deductions</h2>
+      <div class="grid">
+        <label>Filing status
+          <select id="status">
+            <option value="single">Single</option>
+            <option value="married">Married</option>
+          </select>
+        </label>
+        <label>Salary
+          <input id="salary" type="number" value="210000" min="0" step="100">
+        </label>
+        <label>Pre-tax 401(k)
+          <input id="pretax401k" type="number" value="24500" min="0" step="100">
+        </label>
+        <label>HSA
+          <input id="hsa" type="number" value="3000" min="0" step="100">
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <h2>RSUs</h2><button class="secondary" id="addRsu">+ Add RSU vest</button>
+      </div>
+      <div id="rsus"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <h2>ISOs</h2><button class="secondary" id="addIso">+ Add ISO grant</button>
+      </div>
+      <div id="isos"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <h2>NSOs</h2><button class="secondary" id="addNso">+ Add NSO grant</button>
+      </div>
+      <div id="nsos"></div>
+    </section>
+
+    <button class="calculate" id="calculate">Calculate</button>
+
+    <section class="card results">
+      <h2>Results</h2>
+      <div id="results"></div>
+    </section>
+
+    <section class="card">
+      <h2>Cash required for ISO exercise</h2>
+      <div id="cashResults"></div>
+    </section>
+
+    <footer>
+      <p>This is an estimate, not tax advice. Verify assumptions and tax treatment with a qualified tax professional.</p>
+    </footer>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
