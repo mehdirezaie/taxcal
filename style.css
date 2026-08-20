@@ -41,3 +41,13 @@ footer { text-align:center; font-size:13px; }
   .grid, .grant { grid-template-columns:1fr; }
   h1 { font-size:28px; }
 }
+.warning {
+  background: #fffaeb;
+  border: 1px solid #fedf89;
+  color: #7a2e0b;
+  padding: 12px 14px;
+  border-radius: 9px;
+  margin-bottom: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
