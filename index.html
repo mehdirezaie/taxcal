@@ -10,7 +10,7 @@
   <main class="container">
     <header>
       <h1>Federal Tax & Alternative Minimum Tax Calculator</h1>
-      <p>2026 federal tax estimate for salary, RSUs, NSOs, and ISOs.</p>
+      <p>2026 federal tax estimate for salary, RSUs, NSOs, ISOs, capital gains, dividends, and NIIT.</p>
     </header>
 
     <section class="card">
@@ -30,6 +30,27 @@
         </label>
         <label>HSA
           <input id="hsa" type="number" value="0" min="0" step="100">
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Capital gains & investment income</h2>
+      <div class="grid">
+        <label>Long-term capital gains
+          <input id="ltcg" type="number" value="0" min="0" step="100">
+        </label>
+        <label>Qualified dividends
+          <input id="qualDiv" type="number" value="0" min="0" step="100">
+        </label>
+        <label>Interest income
+          <input id="interestIncome" type="number" value="0" min="0" step="100">
+        </label>
+        <label>Non-qualified dividends
+          <input id="nonQualDiv" type="number" value="0" min="0" step="100">
+        </label>
+        <label>Rental/royalty income (net)
+          <input id="rentalRoyalty" type="number" value="0" min="0" step="100">
         </label>
       </div>
     </section>
@@ -69,11 +90,12 @@
     <footer>
       <p>
         <strong>Federal tax estimate only.</strong>
-        This calculator estimates ordinary federal income tax and AMT based on
-        the assumptions entered. It does not calculate payroll taxes, capital
-        gains, tax credits, AMT credit carryforwards, state taxes,
-        withholding, or all IRS adjustments. ISO qualification and AMT treatment
-        may require additional analysis. Use at your own risk.
+        This calculator estimates ordinary federal income tax, AMT, and NIIT based on
+        the assumptions entered. It does not calculate payroll taxes, tax
+        credits, AMT credit carryforwards, state taxes, withholding, foreign-income
+        MAGI addbacks, passive activity loss limitations, or all IRS adjustments.
+        ISO qualification, AMT treatment, and rental/royalty netting may require
+        additional analysis. Use at your own risk.
       </p>
     </footer>
   </main>
