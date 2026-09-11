@@ -10,6 +10,16 @@ const AMT_PHASEOUT_RATE = .5;
 const AMT_BRACKET = {single:244500, married:122250};
 const AMT_RATE_1 = .26, AMT_RATE_2 = .28;
 
+// Rev. Proc. 2025-32 — 2026 LTCG / qualified dividend brackets
+const LTCG_BRACKETS = {
+  single: [[49450,0],[545500,.15],[Infinity,.20]],
+  married: [[98900,0],[613700,.15],[Infinity,.20]]
+};
+
+// Net Investment Income Tax — thresholds fixed by statute, not inflation-adjusted
+const NIIT_THRESHOLD = {single:200000, married:250000};
+const NIIT_RATE = .038;
+
 const $ = id => document.getElementById(id);
 const money = n => "$" + Math.round(n).toLocaleString("en-US");
 
@@ -51,12 +61,37 @@ function amtExemption(amti, status) {
   return Math.max(0, base - (amti - start) * AMT_PHASEOUT_RATE);
 }
 
-function tentativeAMT(amti, status) {
-  const taxable = Math.max(0, amti - amtExemption(amti,status));
+// LTCG/QDI tax, stacked on top of baseIncome (ordinary taxable income or ordinary AMTI base)
+function ltcgTax(baseIncome, capGainsAmount, status) {
+  let tax = 0, stackStart = baseIncome, previous = 0;
+  const stackEnd = baseIncome + capGainsAmount;
+  for (const [limit, rate] of LTCG_BRACKETS[status]) {
+    const bandLow = Math.max(previous, stackStart);
+    const bandHigh = Math.min(limit, stackEnd);
+    if (bandHigh > bandLow) tax += (bandHigh - bandLow) * rate;
+    previous = limit;
+  }
+  return tax;
+}
+
+// AMT with capital-gains carve-out (Form 6251 Part III): LTCG/QDI inside AMTI
+// are taxed at 0/15/20%, not 26/28%. Only the ordinary portion of AMTI
+// (after exemption) gets the 26/28% AMT rates; cap gains stack on top of that.
+function tentativeAMTWithCapGains(amti, capGainsInAMTI, status) {
+  const exemption = amtExemption(amti, status);
+  const ordinaryAMTIBase = Math.max(0, amti - capGainsInAMTI - exemption);
   const bracket = AMT_BRACKET[status];
-  return taxable <= bracket
-    ? taxable * AMT_RATE_1
-    : bracket * AMT_RATE_1 + (taxable - bracket) * AMT_RATE_2;
+  const ordinaryAMTTax = ordinaryAMTIBase <= bracket
+    ? ordinaryAMTIBase * AMT_RATE_1
+    : bracket * AMT_RATE_1 + (ordinaryAMTIBase - bracket) * AMT_RATE_2;
+  const capGainsAMTTax = ltcgTax(ordinaryAMTIBase, capGainsInAMTI, status);
+  return ordinaryAMTTax + capGainsAMTTax;
+}
+
+// 3.8% Net Investment Income Tax on the lesser of net investment income or MAGI over threshold
+function niitTax(magi, netInvestmentIncome, status) {
+  const excess = Math.max(0, magi - NIIT_THRESHOLD[status]);
+  return Math.min(netInvestmentIncome, excess) * NIIT_RATE;
 }
 
 function calculate() {
@@ -64,6 +99,16 @@ function calculate() {
   const salary = Number($("salary").value) || 0;
   const pretax401k = Number($("pretax401k").value) || 0;
   const hsa = Number($("hsa").value) || 0;
+
+  const ltcg = Number($("ltcg").value) || 0;
+  const qualifiedDividends = Number($("qualDiv").value) || 0;
+  const interestIncome = Number($("interestIncome").value) || 0;
+  const nonQualDiv = Number($("nonQualDiv").value) || 0;
+  const rentalRoyalty = Number($("rentalRoyalty").value) || 0;
+
+  const totalCapGains = ltcg + qualifiedDividends;
+  const otherInvestmentIncome = interestIncome + nonQualDiv + rentalRoyalty;
+  const netInvestmentIncome = totalCapGains + otherInvestmentIncome;
 
   const rsus = readGrants("rsus");
   const isos = readGrants("isos");
@@ -76,16 +121,25 @@ function calculate() {
   const isoExerciseValue = isos.reduce((s,x) => s + x.shares * (x.strike || 0),0);
   const isoLimitWarning = isoExerciseValue > 100000;
 
-  const grossIncome = salary + rsuIncome + nsoIncome;
+  // Non-qualified dividends, interest, and rental/royalty are ordinary income.
+  // LTCG + qualified dividends are NOT added here — they stack on top separately.
+  const grossIncome = salary + rsuIncome + nsoIncome + interestIncome + nonQualDiv + rentalRoyalty;
   const taxableIncome = Math.max(0, grossIncome - pretax401k - hsa - STANDARD_DEDUCTION[status]);
-  const regularTax = federalTax(taxableIncome, status);
 
-  // AMTI = taxable income + ISO AMT adjustment + standard deduction.
-  const amti = taxableIncome + isoAdjustment + STANDARD_DEDUCTION[status];
+  const capGainsTax = ltcgTax(taxableIncome, totalCapGains, status);
+  const regularTax = federalTax(taxableIncome, status) + capGainsTax;
+
+  // AMTI = ordinary taxable income + ISO AMT adjustment + standard deduction + cap gains.
+  const amti = taxableIncome + isoAdjustment + STANDARD_DEDUCTION[status] + totalCapGains;
   const exemption = amtExemption(amti, status);
-  const tentative = tentativeAMT(amti, status);
+  const tentative = tentativeAMTWithCapGains(amti, totalCapGains, status);
   const additionalAMT = Math.max(0, tentative - regularTax);
-  const totalFederalTax = regularTax + additionalAMT;
+
+  // MAGI ≈ AGI here (no foreign-income addbacks tracked).
+  const magi = grossIncome - pretax401k - hsa;
+  const niit = niitTax(magi, netInvestmentIncome, status);
+
+  const totalFederalTax = regularTax + additionalAMT + niit;
 
   const rows = [
     ["Salary", salary],
@@ -93,12 +147,20 @@ function calculate() {
     ["NSO Income", nsoIncome],
     ["ISO AMT Adjustment", isoAdjustment],
     ["ISO Exercise Cost", isoCost],
+    ["Interest Income", interestIncome],
+    ["Non-Qualified Dividends", nonQualDiv],
+    ["Rental/Royalty Income", rentalRoyalty],
+    ["Long-Term Capital Gains", ltcg],
+    ["Qualified Dividends", qualifiedDividends],
     ["Taxable Income", taxableIncome],
+    ["Capital Gains Tax", capGainsTax],
     ["Regular Federal Tax", regularTax],
     ["AMTI", amti],
     ["AMT Exemption", exemption],
     ["Tentative AMT", tentative],
     ["Additional AMT", additionalAMT],
+    ["MAGI", magi],
+    ["Net Investment Income Tax", niit],
     ["Total Federal Tax", totalFederalTax]
   ];
 
