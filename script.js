@@ -143,15 +143,23 @@ function calculate() {
   const totalFederalTax = regularTax + additionalAMT + niit;
   const summaryRows = [
     {
-      label: "Taxable Income",
-      value: taxableIncome,
+      label: "Total Income",
+      value: grossIncome + totalCapGains,
       breakdown: [
         ["Salary", salary], ["RSU Income", rsuIncome], ["NSO Income", nsoIncome],
         ["Interest Income", interestIncome], ["Non-Qualified Dividends", nonQualDiv],
         ["Rental/Royalty Income", rentalRoyalty],
-        ["Pre-tax 401(k)", -pretax401k], ["HSA", -hsa], ["Deduction Used", -deduction]
+        ["Long-Term Capital Gains", ltcg], ["Qualified Dividends", qualifiedDividends]
       ]
     },
+    {
+      label: "Taxable Income",
+      value: taxableIncome + totalCapGains,
+      breakdown: [
+        ["Total Income", grossIncome + totalCapGains],
+        ["Pre-tax 401(k)", -pretax401k], ["HSA", -hsa], ["Deduction Used", -deduction]
+      ]
+    },   
     {
       label: "Regular Federal Tax",
       value: regularTax,
