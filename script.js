@@ -1,3 +1,12 @@
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  $("themeToggle").textContent = theme === "dark" ? "☀️ Light mode" : "🌙 Dark mode";
+  localStorage.setItem("theme", theme);
+}
+
+const savedTheme = localStorage.getItem("theme")
+  || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+
 // https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill
 const FEDERAL_BRACKETS = {
   single: [[12400,.10],[50400,.12],[105700,.22],[201775,.24],[256225,.32],[640600,.35],[Infinity,.37]],
@@ -212,3 +221,9 @@ $("addRsu").onclick = () => addGrant("rsus","rsu");
 $("addIso").onclick = () => addGrant("isos","iso");
 $("addNso").onclick = () => addGrant("nsos","nso");
 $("calculate").onclick = calculate;
+
+applyTheme(savedTheme);
+$("themeToggle").onclick = () => {
+  const current = document.documentElement.getAttribute("data-theme");
+  applyTheme(current === "dark" ? "light" : "dark");
+};
