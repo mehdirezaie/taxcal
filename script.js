@@ -20,7 +20,7 @@ const NIIT_THRESHOLD = {single:200000, married:250000};
 const NIIT_RATE = .038;
 
 const $ = id => document.getElementById(id);
-const money = n => "$" + Math.round(n).toLocaleString("en-US");
+const money = n => (n < 0 ? "-$" : "$") + Math.round(Math.abs(n)).toLocaleString("en-US");
 
 function addGrant(container, type, values={shares:"", strike:"", fmv:""}) {
   const div = document.createElement("div");
@@ -141,45 +141,53 @@ function calculate() {
   const niit = niitTax(magi, netInvestmentIncome, status);
 
   const totalFederalTax = regularTax + additionalAMT + niit;
-
-  const rows = [
-    ["Salary", salary],
-    ["RSU Income", rsuIncome],
-    ["NSO Income", nsoIncome],
-    ["ISO AMT Adjustment", isoAdjustment],
-    ["ISO Exercise Cost", isoCost],
-    ["Interest Income", interestIncome],
-    ["Non-Qualified Dividends", nonQualDiv],
-    ["Rental/Royalty Income", rentalRoyalty],
-    ["Long-Term Capital Gains", ltcg],
-    ["Qualified Dividends", qualifiedDividends],
-    ["Deduction Used", deduction],
-    ["Itemizing?", usingItemized ? "Yes" : "No (standard)"],
-    ["Taxable Income", taxableIncome],
-    ["Capital Gains Tax", capGainsTax],
-    ["Regular Federal Tax", regularTax],
-    ["AMTI", amti],
-    ["AMT Exemption", exemption],
-    ["Tentative AMT", tentative],
-    ["Additional AMT", additionalAMT],
-    ["MAGI", magi],
-    ["Net Investment Income Tax", niit],
-    ["Total Federal Tax", totalFederalTax]
+  const summaryRows = [
+    {
+      label: "Taxable Income",
+      value: taxableIncome,
+      breakdown: [
+        ["Salary", salary], ["RSU Income", rsuIncome], ["NSO Income", nsoIncome],
+        ["Interest Income", interestIncome], ["Non-Qualified Dividends", nonQualDiv],
+        ["Rental/Royalty Income", rentalRoyalty],
+        ["Pre-tax 401(k)", -pretax401k], ["HSA", -hsa], ["Deduction Used", -deduction]
+      ]
+    },
+    {
+      label: "Regular Federal Tax",
+      value: regularTax,
+      breakdown: [["Ordinary Tax", regularTax - capGainsTax], ["Capital Gains Tax", capGainsTax]]
+    },
+    {
+      label: "AMT",
+      value: additionalAMT,
+      breakdown: [["Tentative AMT", tentative], ["Less: Regular Tax", -regularTax]]
+    },
+    {
+      label: "Net Investment Income Tax",
+      value: niit,
+      breakdown: [["MAGI", magi], ["Net Investment Income", netInvestmentIncome]]
+    },
+    { label: "Total Federal Tax", value: totalFederalTax, breakdown: null, highlight: true }
   ];
 
-$("results").innerHTML =
-  (isoLimitWarning
-    ? `<div class="warning">
-        ⚠️ ISO exercise value is above $100,000. The $100,000 ISO limitation
-        should be reviewed separately; this calculator does not automatically
-        reclassify excess options as NSOs. Lower the number of shares!
-       </div>`
-    : "") +
-  rows.map(([k,v]) =>
-    `<div class="result-row ${k==="Total Federal Tax" ? "highlight":""}">
-      <span>${k}</span><strong>${money(v)}</strong>
-    </div>`
-  ).join("");
+
+  $("results").innerHTML =
+    (isoLimitWarning
+      ? `<div class="warning">
+          ⚠️ ISO exercise value is above $100,000. The $100,000 ISO limitation
+          should be reviewed separately; this calculator does not automatically
+          reclassify excess options as NSOs. Lower the number of shares!
+         </div>`
+      : "") +
+    summaryRows.map(r => `
+      <div class="result-row ${r.highlight ? "highlight" : ""} ${r.breakdown ? "has-tooltip" : ""}">
+        <span>${r.label}</span><strong>${money(r.value)}</strong>
+        ${r.breakdown ? `
+          <div class="tooltip">
+            ${r.breakdown.map(([k,v]) => `<div class="tooltip-row"><span>${k}</span><span>${money(v)}</span></div>`).join("")}
+          </div>` : ""}
+      </div>
+    `).join("");
 
   $("cashResults").innerHTML = [
     ["ISO Exercise Cost", isoCost],
