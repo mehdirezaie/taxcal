@@ -1,12 +1,3 @@
-function applyTheme(theme) {
-  document.documentElement.setAttribute("data-theme", theme);
-  $("themeToggle").textContent = theme === "dark" ? "☀️ Light mode" : "🌙 Dark mode";
-  localStorage.setItem("theme", theme);
-}
-
-const savedTheme = localStorage.getItem("theme")
-  || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-
 // https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill
 const FEDERAL_BRACKETS = {
   single: [[12400,.10],[50400,.12],[105700,.22],[201775,.24],[256225,.32],[640600,.35],[Infinity,.37]],
@@ -18,16 +9,12 @@ const AMT_PHASEOUT_START = {single:500000, married:1000000};
 const AMT_PHASEOUT_RATE = .5;
 const AMT_BRACKET = {single:244500, married:122250};
 const AMT_RATE_1 = .26, AMT_RATE_2 = .28;
-
-// Rev. Proc. 2025-32 — 2026 LTCG / qualified dividend brackets
 const LTCG_BRACKETS = {
   single: [[49450,0],[545500,.15],[Infinity,.20]],
   married: [[98900,0],[613700,.15],[Infinity,.20]]
 };
-
 const NIIT_THRESHOLD = {single:200000, married:250000};
 const NIIT_RATE = .038;
-
 const $ = id => document.getElementById(id);
 const money = n => (n < 0 ? "-$" : "$") + Math.round(Math.abs(n)).toLocaleString("en-US");
 
@@ -81,10 +68,10 @@ function ltcgTax(baseIncome, capGainsAmount, status) {
   return tax;
 }
 
-// LTCG/QDI inside AMTI are taxed at 0/15/20%, not 26/28%.
+// LTCG/QDI inside AMTI are taxed differently
 function tentativeAMTWithCapGains(amti, capGainsInAMTI, status) {
-  const exemption = amtExemption(amti, status);
-  const ordinaryAMTIBase = Math.max(0, amti - capGainsInAMTI - exemption);
+  const amtExemptionAmount = amtExemption(amti, status);
+  const ordinaryAMTIBase = Math.max(0, amti - capGainsInAMTI - amtExemptionAmount);
   const bracket = AMT_BRACKET[status];
   const ordinaryAMTTax = ordinaryAMTIBase <= bracket
     ? ordinaryAMTIBase * AMT_RATE_1
@@ -110,16 +97,16 @@ function calculate() {
   const interestIncome = Number($("interestIncome").value) || 0;
   const nonQualDiv = Number($("nonQualDiv").value) || 0;
   const rentalRoyalty = Number($("rentalRoyalty").value) || 0;
-
+  
   const hasItemized = saltInput !== "" || otherInput !== "";
   const saltDeduction = Number(saltInput) || 0;
   const otherItemized = Number(otherInput) || 0;
   const totalItemized = saltDeduction + otherItemized;
   const usingItemized = hasItemized && totalItemized > STANDARD_DEDUCTION[status];
-  const deduction = usingItemized ? totalItemized : STANDARD_DEDUCTION[status];
-  const totalCapGains = ltcg + qualifiedDividends;
+  const appliedDeduction = usingItemized ? totalItemized : STANDARD_DEDUCTION[status];
+  const capGainsAndQDI = ltcg + qualifiedDividends;
   const otherInvestmentIncome = interestIncome + nonQualDiv + rentalRoyalty;
-  const netInvestmentIncome = totalCapGains + otherInvestmentIncome;
+  const netInvestmentIncome = capGainsAndQDI + otherInvestmentIncome;
 
   const rsus = readGrants("rsus");
   const isos = readGrants("isos");
@@ -132,28 +119,25 @@ function calculate() {
   const isoExerciseValue = isos.reduce((s,x) => s + x.shares * (x.strike || 0),0);
   const isoLimitWarning = isoExerciseValue > 100000;
 
-  // LTCG + qualified dividends are tax differently than the ordinary income
-  const grossIncome = salary + rsuIncome + nsoIncome + interestIncome + nonQualDiv + rentalRoyalty;
-  const taxableIncome = Math.max(0, grossIncome - pretax401k - hsa - deduction);
-  const capGainsTax = ltcgTax(taxableIncome, totalCapGains, status);
+  // LTCG + qualified dividends (capGainsAndQDI) are taxed differently than ordinary income,
+  // so they're kept out of ordinaryGrossIncome and stacked on top separately.
+  const ordinaryGrossIncome = salary + rsuIncome + nsoIncome + interestIncome + nonQualDiv + rentalRoyalty;
+  const taxableIncome = Math.max(0, ordinaryGrossIncome - pretax401k - hsa - appliedDeduction);
+  const capGainsTax = ltcgTax(taxableIncome, capGainsAndQDI, status);
   const regularTax = federalTax(taxableIncome, status) + capGainsTax;
-
   const amtiAddback = usingItemized ? saltDeduction : STANDARD_DEDUCTION[status];
-  const amti = taxableIncome + isoAdjustment + amtiAddback + totalCapGains;
-  
-  const exemption = amtExemption(amti, status);
-  const tentative = tentativeAMTWithCapGains(amti, totalCapGains, status);
-  const additionalAMT = Math.max(0, tentative - regularTax);
-
-  // no foreign-income addbacks tracke
-  const magi = grossIncome + totalCapGains - pretax401k - hsa;
+  const amti = taxableIncome + isoAdjustment + amtiAddback + capGainsAndQDI;
+  const amtExemptionAmount = amtExemption(amti, status);
+  const tentativeAMT = tentativeAMTWithCapGains(amti, capGainsAndQDI, status);
+  const additionalAMT = Math.max(0, tentativeAMT - regularTax);
+  const magi = ordinaryGrossIncome + capGainsAndQDI - pretax401k - hsa;
   const niit = niitTax(magi, netInvestmentIncome, status);
-
   const totalFederalTax = regularTax + additionalAMT + niit;
+  
   const summaryRows = [
     {
       label: "Total Income",
-      value: grossIncome + totalCapGains,
+      value: ordinaryGrossIncome + capGainsAndQDI,
       breakdown: [
         ["Salary", salary], ["RSU Income", rsuIncome], ["NSO Income", nsoIncome],
         ["Interest Income", interestIncome], ["Non-Qualified Dividends", nonQualDiv],
@@ -163,12 +147,12 @@ function calculate() {
     },
     {
       label: "Taxable Income",
-      value: taxableIncome + totalCapGains,
+      value: taxableIncome + capGainsAndQDI,
       breakdown: [
-        ["Total Income", grossIncome + totalCapGains],
-        ["Pre-tax 401(k)", -pretax401k], ["HSA", -hsa], ["Deduction Used", -deduction]
+        ["Total Income", ordinaryGrossIncome + capGainsAndQDI],
+        ["Pre-tax 401(k)", -pretax401k], ["HSA", -hsa], ["Deduction Used", -appliedDeduction]
       ]
-    },   
+    },
     {
       label: "Regular Federal Tax",
       value: regularTax,
@@ -177,7 +161,7 @@ function calculate() {
     {
       label: "AMT",
       value: additionalAMT,
-      breakdown: [["Tentative AMT", tentative], ["Less: Regular Tax", -regularTax]]
+      breakdown: [["Tentative AMT", tentativeAMT], ["Less: Regular Tax", -regularTax]]
     },
     {
       label: "Net Investment Income Tax",
@@ -221,6 +205,16 @@ $("addRsu").onclick = () => addGrant("rsus","rsu");
 $("addIso").onclick = () => addGrant("isos","iso");
 $("addNso").onclick = () => addGrant("nsos","nso");
 $("calculate").onclick = calculate;
+
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  $("themeToggle").textContent = theme === "dark" ? "☀️ Light mode" : "🌙 Dark mode";
+  localStorage.setItem("theme", theme);
+}
+
+const savedTheme = localStorage.getItem("theme")
+  || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 
 applyTheme(savedTheme);
 $("themeToggle").onclick = () => {
