@@ -146,7 +146,7 @@ function calculate() {
   const additionalAMT = Math.max(0, tentative - regularTax);
 
   // no foreign-income addbacks tracke
-  const magi = grossIncome - pretax401k - hsa;
+  const magi = grossIncome + totalCapGains - pretax401k - hsa;
   const niit = niitTax(magi, netInvestmentIncome, status);
 
   const totalFederalTax = regularTax + additionalAMT + niit;
