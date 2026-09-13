@@ -51,3 +51,13 @@ footer { text-align:center; font-size:13px; }
   font-size: 14px;
   line-height: 1.5;
 }
+.result-row.has-tooltip { position: relative; cursor: help; }
+.tooltip {
+  display: none;
+  position: absolute; top: 100%; left: 0; z-index: 10;
+  background: #172033; color: white; border-radius: 8px;
+  padding: 10px 12px; font-size: 13px; white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(16,24,40,.2);
+}
+.result-row.has-tooltip:hover .tooltip { display: block; }
+.tooltip-row { display: flex; justify-content: space-between; gap: 16px; padding: 2px 0; }
