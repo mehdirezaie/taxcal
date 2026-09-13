@@ -5,6 +5,32 @@ body {
   background: #f5f7fb;
   color: #172033;
 }
+:root {
+  --bg: #f5f7fb;
+  --text: #172033;
+  --card-bg: #ffffff;
+  --card-border: #e4e7ec;
+  --input-border: #d0d5dd;
+  --muted: #667085;
+  --row-border: #eaecf0;
+  --grant-bg: #f8fafc;
+  --tooltip-bg: #172033;
+  --tooltip-text: #ffffff;
+}
+
+[data-theme="dark"] {
+  --bg: #0f1420;
+  --text: #e4e7ec;
+  --card-bg: #171d2b;
+  --card-border: #2a3244;
+  --input-border: #3a4356;
+  --muted: #94a3b8;
+  --row-border: #2a3244;
+  --grant-bg: #1e2534;
+  --tooltip-bg: #eef2ff;
+  --tooltip-text: #172033;
+}
+
 .container { max-width: 1000px; margin: 0 auto; padding: 32px 18px 60px; }
 header { margin-bottom: 24px; }
 h1 { margin: 0 0 8px; font-size: 34px; }
