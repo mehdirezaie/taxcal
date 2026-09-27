@@ -15,6 +15,10 @@ const LTCG_BRACKETS = {
 };
 const NIIT_THRESHOLD = {single:200000, married:250000};
 const NIIT_RATE = .038;
+const SALT_CAP = 40400;
+const SALT_PHASEOUT_START = 505000;
+const SALT_PHASEOUT_RATE = .30;
+const SALT_FLOOR = 10000;
 const ADDL_MEDICARE_THRESHOLD = {single:200000, married:250000};
 const ADDL_MEDICARE_RATE = .009;
 const $ = id => document.getElementById(id);
@@ -92,6 +96,12 @@ function addlMedicareTax(medicareWages, status) {
   return excess * ADDL_MEDICARE_RATE;
 }
 
+// OBBBA SALT cap: $40,400 for 2026, phased down 30% of MAGI above $505,000, floor $10,000.
+function saltDeductionCap(magi, status) {
+  const reduction = SALT_PHASEOUT_RATE * Math.max(0, magi - SALT_PHASEOUT_START);
+  return Math.max(SALT_FLOOR, SALT_CAP - reduction);
+}
+
 function calculate() {
   const status = $("status").value;
   const salary = Number($("salary").value) || 0;
@@ -104,13 +114,7 @@ function calculate() {
   const interestIncome = Number($("interestIncome").value) || 0;
   const nonQualDiv = Number($("nonQualDiv").value) || 0;
   const rentalRoyalty = Number($("rentalRoyalty").value) || 0;
-  
-  const hasItemized = saltInput !== "" || otherInput !== "";
-  const saltDeduction = Number(saltInput) || 0;
-  const otherItemized = Number(otherInput) || 0;
-  const totalItemized = saltDeduction + otherItemized;
-  const usingItemized = hasItemized && totalItemized > STANDARD_DEDUCTION[status];
-  const appliedDeduction = usingItemized ? totalItemized : STANDARD_DEDUCTION[status];
+
   const capGainsAndQDI = ltcg + qualifiedDividends;
   const otherInvestmentIncome = interestIncome + nonQualDiv + rentalRoyalty;
   const netInvestmentIncome = capGainsAndQDI + otherInvestmentIncome;
@@ -131,6 +135,20 @@ function calculate() {
   // LTCG + qualified dividends (capGainsAndQDI) are taxed differently than ordinary income,
   // so they're kept out of ordinaryGrossIncome and stacked on top separately.
   const ordinaryGrossIncome = salary + rsuIncome + nsoIncome + interestIncome + nonQualDiv + rentalRoyalty;
+
+  // MAGI needed up front to determine the SALT deduction cap (OBBBA phaseout depends on MAGI).
+  const preCapMagi = ordinaryGrossIncome + capGainsAndQDI - pretax401k - hsa;
+
+  const hasItemized = saltInput !== "" || otherInput !== "";
+  const rawSaltDeduction = Number(saltInput) || 0;
+  const saltCap = saltDeductionCap(preCapMagi, status);
+  const saltDeduction = Math.min(rawSaltDeduction, saltCap);
+  const saltCapped = rawSaltDeduction > saltCap;
+  const otherItemized = Number(otherInput) || 0;
+  const totalItemized = saltDeduction + otherItemized;
+  const usingItemized = hasItemized && totalItemized > STANDARD_DEDUCTION[status];
+  const appliedDeduction = usingItemized ? totalItemized : STANDARD_DEDUCTION[status];
+
   const taxableIncome = Math.max(0, ordinaryGrossIncome - pretax401k - hsa - appliedDeduction);
   const capGainsTax = ltcgTax(taxableIncome, capGainsAndQDI, status);
   const regularTax = federalTax(taxableIncome, status) + capGainsTax;
@@ -140,6 +158,9 @@ function calculate() {
   const tentativeAMT = tentativeAMTWithCapGains(amti, capGainsAndQDI, status);
   const additionalAMT = Math.max(0, tentativeAMT - regularTax);
   const amtTriggeredWarning = additionalAMT > 0;
+
+  // MAGI recomputed here is identical to preCapMagi (same inputs, order doesn't matter for this formula);
+  // kept as its own variable for readability at the point of use.
   const magi = ordinaryGrossIncome + capGainsAndQDI - pretax401k - hsa;
   const niit = niitTax(magi, netInvestmentIncome, status);
   const totalFederalTax = regularTax + additionalAMT + niit + addlMedicare;
@@ -196,9 +217,15 @@ function calculate() {
       : "") +
     (amtTriggeredWarning
       ? `<div class="warning">
-	  ⚠️ This scenario triggers ${money(additionalAMT)} of additional AMT.
-	  Reduce ISO shares exercised to stay under the AMT threshold.
-	 </div>`
+          ⚠️ This scenario triggers ${money(additionalAMT)} of additional AMT.
+          Reduce ISO shares exercised to stay under the AMT threshold.
+         </div>`
+      : "") +
+    (saltCapped
+      ? `<div class="warning">
+          ⚠️ Your SALT deduction was capped at ${money(saltCap)} based on your MAGI
+          (entered: ${money(rawSaltDeduction)}).
+         </div>`
       : "") +
     summaryRows.map(r => `
       <div class="result-row ${r.highlight ? "highlight" : ""} ${r.breakdown ? "has-tooltip" : ""}">
