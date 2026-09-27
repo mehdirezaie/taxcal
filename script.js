@@ -15,6 +15,8 @@ const LTCG_BRACKETS = {
 };
 const NIIT_THRESHOLD = {single:200000, married:250000};
 const NIIT_RATE = .038;
+const ADDL_MEDICARE_THRESHOLD = {single:200000, married:250000};
+const ADDL_MEDICARE_RATE = .009;
 const $ = id => document.getElementById(id);
 const money = n => (n < 0 ? "-$" : "$") + Math.round(Math.abs(n)).toLocaleString("en-US");
 
@@ -85,6 +87,11 @@ function niitTax(magi, netInvestmentIncome, status) {
   return Math.min(netInvestmentIncome, excess) * NIIT_RATE;
 }
 
+function addlMedicareTax(medicareWages, status) {
+  const excess = Math.max(0, medicareWages - ADDL_MEDICARE_THRESHOLD[status]);
+  return excess * ADDL_MEDICARE_RATE;
+}
+
 function calculate() {
   const status = $("status").value;
   const salary = Number($("salary").value) || 0;
@@ -114,6 +121,8 @@ function calculate() {
 
   const rsuIncome = rsus.reduce((s,x) => s + x.shares * (x.price || 0), 0);
   const nsoIncome = nsos.reduce((s,x) => s + x.shares * ((x.fmv||0)-(x.strike||0)), 0);
+  const medicareWages = salary + rsuIncome + nsoIncome;
+  const addlMedicare = addlMedicareTax(medicareWages, status);
   const isoAdjustment = isos.reduce((s,x) => s + x.shares * ((x.fmv||0)-(x.strike||0)), 0);
   const isoCost = isos.reduce((s,x) => s + x.shares * (x.strike||0), 0);
   const isoExerciseValue = isos.reduce((s,x) => s + x.shares * (x.strike || 0),0);
@@ -130,10 +139,10 @@ function calculate() {
   const amtExemptionAmount = amtExemption(amti, status);
   const tentativeAMT = tentativeAMTWithCapGains(amti, capGainsAndQDI, status);
   const additionalAMT = Math.max(0, tentativeAMT - regularTax);
+  const amtTriggeredWarning = additionalAMT > 0;
   const magi = ordinaryGrossIncome + capGainsAndQDI - pretax401k - hsa;
   const niit = niitTax(magi, netInvestmentIncome, status);
-  const totalFederalTax = regularTax + additionalAMT + niit;
-  
+  const totalFederalTax = regularTax + additionalAMT + niit + addlMedicare;
   const summaryRows = [
     {
       label: "Total Income",
@@ -168,6 +177,11 @@ function calculate() {
       value: niit,
       breakdown: [["MAGI", magi], ["Net Investment Income", netInvestmentIncome]]
     },
+    {
+      label: "Additional Medicare Tax",
+      value: addlMedicare,
+      breakdown: [["Medicare Wages", medicareWages], ["Threshold", ADDL_MEDICARE_THRESHOLD[status]]]
+    },
     { label: "Total Federal Tax", value: totalFederalTax, breakdown: null, highlight: true }
   ];
 
@@ -179,6 +193,12 @@ function calculate() {
           should be reviewed separately; this calculator does not automatically
           reclassify excess options as NSOs. Lower the number of shares!
          </div>`
+      : "") +
+    (amtTriggeredWarning
+      ? `<div class="warning">
+	  ⚠️ This scenario triggers ${money(additionalAMT)} of additional AMT.
+	  Reduce ISO shares exercised to stay under the AMT threshold.
+	 </div>`
       : "") +
     summaryRows.map(r => `
       <div class="result-row ${r.highlight ? "highlight" : ""} ${r.breakdown ? "has-tooltip" : ""}">
